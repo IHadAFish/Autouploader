@@ -7,7 +7,7 @@ from datetime import datetime
 import json, subprocess, os, sys, getopt
 
 class TwitchDownloader():
-    def __init__(self, username, quality, refresh_interval, ffmpath, uploader):
+    def __init__(self, username, quality, refresh_interval, ffmpath, uploader, remove_local):
         self.cid = "sspxioekgd3jbq5mxcyvil7bsigsg0"
         self.cs = "x7m6nejn7ob5y2mf596jxj2a01ycgg"
         self.token = self.get_token()
@@ -16,6 +16,7 @@ class TwitchDownloader():
         self.quality = quality
         self.username = username
         self.user_id = self.get_id()
+        self.remove_local = remove_local
 
         self.ffmpeg_path = ffmpath
         self.uploader = uploader
@@ -146,7 +147,7 @@ class TwitchDownloader():
             else:
                 print("Skip fixing. File not found.")
 
-            self.uploader.upload(processed_filename, upload_info)
+            self.uploader.upload(processed_filename, upload_info, self.remove_local)
 
             print("Wating for new stream.")
 
@@ -156,14 +157,23 @@ class YoutubeUploader():
         self.uploaderpath = uploaderpath
         self.cs = client_secrets
 
-    def upload(self, vod, info):
+    def upload(self, vod, info, remove_local):
         print("Uploading vod...")
 
         if os.path.exists(vod):
             try:
+                subprocess.call([self.uploaderpath, vod, "--privacy", "public", "--default-language", "en", "--default-audio-language", "en", "--title", info["title"], "--description", info["desc"], "--client-secrets", self.cs])
+
+            except OSError:
                 subprocess.call(["python", self.uploaderpath, vod, "--privacy", "public", "--default-language", "en", "--default-audio-language", "en", "--title", info["title"], "--description", info["desc"], "--client-secrets", self.cs])
+
             except Exception as e:
                 print(e)
+
+            if remove_local:
+                print("Removing local file...")
+                os.remove(vod)
+                print("Vod removed.")
         else:
             print("File not found.")
 
@@ -175,13 +185,14 @@ def main(argv):
         "refresh-interval": 30,
         "ffmpeg-path": "ffmpeg",
         "uploader-path": "youtube-uploader",
-        "uploader-secrets": "./client_secrets.json"
+        "uploader-secrets": "./client_secrets.json",
+        "remove-local": 1
     }
 
     manuals = {}
 
     try:
-        opts = getopt.getopt(argv, "", ["username=", "quality=", "ffmpeg-path=", "uploader-path=", "refresh-interval=", "uploader-secrets="])[0]
+        opts = getopt.getopt(argv, "", ["username=", "quality=", "ffmpeg-path=", "uploader-path=", "refresh-interval=", "uploader-secrets=", "remove-local="])[0]
 
         for opt in opts:
             manuals[opt[0][2:]] = opt[1]
@@ -199,6 +210,7 @@ def main(argv):
         quality = options["quality"],
         refresh_interval = options["refresh-interval"],
         ffmpath = options["ffmpeg-path"],
+        remove_local = options["remove-local"],
         uploader = uploader
     )
 
